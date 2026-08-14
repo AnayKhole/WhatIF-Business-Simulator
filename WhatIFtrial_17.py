@@ -1,12 +1,3 @@
-"""
-Pure Python Business Growth Simulator with Interactive GUI
-A comprehensive Monte Carlo simulation using only built-in Python libraries
-
-Author: AI Assistant
-Version: 3.0 - Complete Fixed Edition
-Requirements: Python 3.7+ with matplotlib and numpy
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
