@@ -61,8 +61,8 @@ Features
 - **Data export** — summary CSV, full detailed CSV (every simulation/year
   combination), a text report, and chart images (PNG/PDF) can all be exported.
 
-- **Runs on core Python** — includes a lightweight custom `SimpleDataFrame` /
-  `SimpleGroupBy` implementation so the simulation and aggregation logic don't
+- **Runs on core Python** — includes a lightweight custom 'SimpleDataFrame' /
+  'SimpleGroupBy' implementation so the simulation and aggregation logic don't
   require pandas, keeping dependencies minimal.
 
 Tech Stack
@@ -70,7 +70,7 @@ Tech Stack
 - **Python 3.7+**
 - **Tkinter / ttk** — GUI, including a scrollable input panel, tabbed interface, and
   a dedicated growth-calculator sidebar
-- **matplotlib** — results charts, embedded in Tkinter via `FigureCanvasTkAgg`
+- **matplotlib** — results charts, embedded in Tkinter via 'FigureCanvasTkAgg'
 - **NumPy** — random sampling for the Monte Carlo simulation and summary statistics
 - **dataclasses, threading, csv, json** — from the standard library
 
@@ -80,9 +80,9 @@ How It Works
    baseline growth rate, simulation length) — optionally deriving the growth rate
    from their own historical data or a CAGR calculation using the side-panel tools.
 2. The user chooses strategic decisions via sliders and checkboxes.
-3. A `DecisionImpactCalculator` converts those decisions into adjustments to the
+3. A 'DecisionImpactCalculator' converts those decisions into adjustments to the
    growth rate, annual costs, and risk factor.
-4. For each selected market scenario, a `MonteCarloSimulator` runs the chosen number
+4. For each selected market scenario, a 'MonteCarloSimulator' runs the chosen number
    of simulations, applying the scenario's growth/cost modifiers plus random
    volatility each year, and records revenue, costs, and profit for every
    simulation/year.
