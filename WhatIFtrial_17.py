@@ -1,3 +1,8 @@
+"""
+Python Business Growth Simulator - Interactive GUI
+Monte Carlo simulation using only built-in Python libraries
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
@@ -77,7 +82,7 @@ class SimpleGroupBy:
 # Configure matplotlib
 plt.style.use('default')
 plt.rcParams['figure.facecolor'] = 'white'
-plt.rcParams['axes.facecolor'] = '#f8f9fa'
+plt.rcParams['axes.facecolor'] = "#d4d8db"
 plt.rcParams['axes.grid'] = True
 plt.rcParams['grid.alpha'] = 0.3
 plt.rcParams['font.size'] = 9
@@ -87,6 +92,7 @@ class BusinessParameters:
     base_revenue: float
     base_costs: float
     num_employees: int
+    avg_employee_salary: float
     baseline_growth_rate: float
     simulation_years: int
 
@@ -115,14 +121,13 @@ DEFAULT_SCENARIOS = [
 
 class DecisionImpactCalculator:
     def __init__(self):
-        self.HIRING_GROWTH_MULTIPLIER = 0.015
-        self.HIRING_COST_MULTIPLIER = 55000
-        self.EXPANSION_GROWTH_BOOST = 0.12
+        self.HIRING_GROWTH_MULTIPLIER = 0.0015  # Reduced from 0.015 to 0.0015 (0.15% per employee)
+        self.EXPANSION_GROWTH_BOOST = 0.02      # Reduced from 0.12 to 0.02 (2%)
         self.EXPANSION_COST_MULTIPLIER = 0.25
         self.EXPANSION_RISK_FACTOR = 0.08
         self.AUTOMATION_COST_REDUCTION = 0.003
-        self.AUTOMATION_PRODUCTIVITY_BOOST = 0.001
-        self.MARKETING_ROI = 0.000002
+        self.AUTOMATION_PRODUCTIVITY_BOOST = 0.0001  # Reduced from 0.001 to 0.0001
+        self.MARKETING_ROI = 0.0000002  # Reduced from 0.000002 to 0.0000002
     
     def calculate_impacts(self, decisions: StrategicDecisions, base_params: BusinessParameters) -> Dict:
         impacts = {
@@ -137,10 +142,10 @@ class DecisionImpactCalculator:
             }
         }
         
-        # Staff hiring
+        # Staff hiring - now uses the user-defined average salary
         if decisions.staff_to_hire > 0:
             growth_impact = decisions.staff_to_hire * self.HIRING_GROWTH_MULTIPLIER
-            cost_impact = decisions.staff_to_hire * self.HIRING_COST_MULTIPLIER
+            cost_impact = decisions.staff_to_hire * base_params.avg_employee_salary
             impacts['growth_rate_adjustment'] += growth_impact
             impacts['cost_adjustment'] += cost_impact
             impacts['breakdown']['hiring'] = {'growth': growth_impact, 'cost': cost_impact}
@@ -258,6 +263,7 @@ class MonteCarloSimulator:
             base_revenue=base_params.base_revenue,
             base_costs=adjusted_costs,
             num_employees=base_params.num_employees,
+            avg_employee_salary=base_params.avg_employee_salary,
             baseline_growth_rate=adjusted_growth,
             simulation_years=base_params.simulation_years
         )
@@ -267,7 +273,7 @@ class BusinessSimulatorGUI:
         self.root = tk.Tk()
         self.root.title("Business Growth Simulator")
         self.root.geometry("1400x900")
-        self.root.configure(bg='#f0f0f0')
+        self.root.configure(bg="#f0f0f0")
         
         self.style = ttk.Style()
         self.style.theme_use('clam')
@@ -298,8 +304,16 @@ class BusinessSimulatorGUI:
         input_frame = ttk.Frame(self.notebook)
         self.notebook.add(input_frame, text="Parameters & Decisions")
         
-        canvas = tk.Canvas(input_frame, bg='#f0f0f0')
-        scrollbar = ttk.Scrollbar(input_frame, orient="vertical", command=canvas.yview)
+        # Create main horizontal layout
+        main_horizontal_frame = ttk.Frame(input_frame)
+        main_horizontal_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Left side - Parameters (scrollable)
+        left_frame = ttk.Frame(main_horizontal_frame)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        canvas = tk.Canvas(left_frame, bg="#f0f0f0")
+        scrollbar = ttk.Scrollbar(left_frame, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         
         scrollable_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -315,8 +329,16 @@ class BusinessSimulatorGUI:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
+        # Right side - Growth Rate Calculators
+        right_frame = ttk.Frame(main_horizontal_frame)
+        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        
+        self.create_left_side_content(scrollable_frame)
+        self.create_growth_calculators(right_frame)
+    
+    def create_left_side_content(self, parent):
         # Base Parameters
-        base_frame = ttk.LabelFrame(scrollable_frame, text="Base Business Parameters", padding=10)
+        base_frame = ttk.LabelFrame(parent, text="Base Business Parameters", padding=10)
         base_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Label(base_frame, text="Base Annual Revenue (£):").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -331,24 +353,31 @@ class BusinessSimulatorGUI:
         self.employees_var = tk.IntVar(value=50)
         ttk.Spinbox(base_frame, from_=1, to=10000, textvariable=self.employees_var, width=13).grid(row=2, column=1, padx=5)
         
-        ttk.Label(base_frame, text="Baseline Growth Rate (%):").grid(row=3, column=0, sticky=tk.W, pady=2)
+        # Employee salary field
+        ttk.Label(base_frame, text="Average Employee Salary (£):").grid(row=3, column=0, sticky=tk.W, pady=2)
+        self.salary_var = tk.StringVar(value="55000")
+        salary_entry = ttk.Entry(base_frame, textvariable=self.salary_var, width=15)
+        salary_entry.grid(row=3, column=1, padx=5)
+        salary_entry.bind('<KeyRelease>', self.update_staff_label_on_salary_change)
+        
+        ttk.Label(base_frame, text="Baseline Growth Rate (%):").grid(row=4, column=0, sticky=tk.W, pady=2)
         self.growth_var = tk.DoubleVar(value=5.0)
         growth_scale = ttk.Scale(base_frame, from_=-10, to=50, variable=self.growth_var, orient=tk.HORIZONTAL, length=200)
-        growth_scale.grid(row=3, column=1, padx=5)
+        growth_scale.grid(row=4, column=1, padx=5)
         self.growth_label = ttk.Label(base_frame, text="5.0%")
-        self.growth_label.grid(row=3, column=2)
+        self.growth_label.grid(row=4, column=2)
         growth_scale.configure(command=self.update_growth_label)
         
-        ttk.Label(base_frame, text="Simulation Years:").grid(row=4, column=0, sticky=tk.W, pady=2)
+        ttk.Label(base_frame, text="Simulation Years:").grid(row=5, column=0, sticky=tk.W, pady=2)
         self.years_var = tk.IntVar(value=5)
         years_scale = ttk.Scale(base_frame, from_=1, to=15, variable=self.years_var, orient=tk.HORIZONTAL, length=200)
-        years_scale.grid(row=4, column=1, padx=5)
+        years_scale.grid(row=5, column=1, padx=5)
         self.years_label = ttk.Label(base_frame, text="5 years")
-        self.years_label.grid(row=4, column=2)
+        self.years_label.grid(row=5, column=2)
         years_scale.configure(command=self.update_years_label)
         
         # Strategic Decisions
-        decisions_frame = ttk.LabelFrame(scrollable_frame, text="Strategic Decisions", padding=10)
+        decisions_frame = ttk.LabelFrame(parent, text="Strategic Decisions", padding=10)
         decisions_frame.pack(fill=tk.X, padx=10, pady=5)
         
         # Staff hiring
@@ -407,10 +436,10 @@ class BusinessSimulatorGUI:
         self.marketing_impact_label.grid(row=1, column=0, columnspan=2, sticky=tk.W)
         
         # Scenarios
-        self.create_scenario_selection_frame(scrollable_frame)
+        self.create_scenario_selection_frame(parent)
         
         # Simulation Settings
-        sim_frame = ttk.LabelFrame(scrollable_frame, text="Simulation Settings", padding=10)
+        sim_frame = ttk.LabelFrame(parent, text="Simulation Settings", padding=10)
         sim_frame.pack(fill=tk.X, padx=10, pady=5)
         
         ttk.Label(sim_frame, text="Monte Carlo Simulations:").grid(row=0, column=0, sticky=tk.W)
@@ -421,7 +450,7 @@ class BusinessSimulatorGUI:
         sim_combo.current(2)
         
         # Run button and progress
-        run_frame = ttk.Frame(scrollable_frame)
+        run_frame = ttk.Frame(parent)
         run_frame.pack(fill=tk.X, padx=10, pady=20)
         
         self.run_button = ttk.Button(run_frame, text="Run Simulation", command=self.run_simulation)
@@ -433,6 +462,249 @@ class BusinessSimulatorGUI:
         
         self.status_label = ttk.Label(run_frame, text="Ready to run simulation")
         self.status_label.pack(side=tk.RIGHT, padx=5)
+    
+    def create_growth_calculators(self, parent):
+        # Main title
+        title_frame = ttk.Frame(parent)
+        title_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(title_frame, text="Growth Rate Calculators", 
+                 font=('Arial', 12, 'bold')).pack()
+        ttk.Label(title_frame, text="Use your historical data to calculate growth rates", 
+                 font=('Arial', 9), foreground='gray').pack()
+        
+        # Calculator 1: Historical Revenue Growth
+        calc1_frame = ttk.LabelFrame(parent, text="Historical Revenue Growth Calculator", padding=10)
+        calc1_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Instructions
+        instruction_text = ("Enter revenue figures from consecutive years.\n"
+                          "Example: 2022: £800,000 → 2023: £900,000 → 2024: £1,000,000")
+        ttk.Label(calc1_frame, text=instruction_text, font=('Arial', 8), 
+                 foreground='blue', wraplength=280).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Revenue entry fields with dynamic rows
+        self.revenue_entries_frame = ttk.Frame(calc1_frame)
+        self.revenue_entries_frame.pack(fill=tk.X)
+        
+        self.revenue_entries = []
+        self.year_entries = []
+        
+        # Initial 3 rows
+        for i in range(3):
+            self.add_revenue_row(i)
+        
+        # Add/Remove buttons
+        button_frame = ttk.Frame(calc1_frame)
+        button_frame.pack(fill=tk.X, pady=(5, 0))
+        ttk.Button(button_frame, text="Add Year", command=self.add_revenue_year).pack(side=tk.LEFT, padx=2)
+        ttk.Button(button_frame, text="Remove Year", command=self.remove_revenue_year).pack(side=tk.LEFT, padx=2)
+        
+        # Calculate button and result
+        calc_button_frame = ttk.Frame(calc1_frame)
+        calc_button_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(calc_button_frame, text="Calculate Average Growth", 
+                  command=self.calculate_historical_growth).pack(side=tk.LEFT)
+        
+        self.historical_result_label = ttk.Label(calc1_frame, text="Result: --", 
+                                               foreground='green', font=('Arial', 10, 'bold'))
+        self.historical_result_label.pack(anchor=tk.W, pady=(5, 0))
+        
+        # Apply button
+        ttk.Button(calc1_frame, text="Apply to Simulation", 
+                  command=self.apply_historical_growth).pack(anchor=tk.W, pady=(5, 0))
+        
+        # Calculator 2: CAGR Calculator
+        calc2_frame = ttk.LabelFrame(parent, text="Compound Annual Growth Rate (CAGR) Calculator", padding=10)
+        calc2_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        # Instructions
+        cagr_instruction = ("Enter starting value, ending value, and number of years\n"
+                          "to calculate compound annual growth rate.")
+        ttk.Label(calc2_frame, text=cagr_instruction, font=('Arial', 8), 
+                 foreground='blue', wraplength=280).pack(anchor=tk.W, pady=(0, 10))
+        
+        # CAGR input fields
+        cagr_input_frame = ttk.Frame(calc2_frame)
+        cagr_input_frame.pack(fill=tk.X)
+        
+        ttk.Label(cagr_input_frame, text="Starting Value (£):").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.cagr_start_var = tk.StringVar(value="")
+        ttk.Entry(cagr_input_frame, textvariable=self.cagr_start_var, width=15).grid(row=0, column=1, padx=5)
+        
+        ttk.Label(cagr_input_frame, text="Ending Value (£):").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.cagr_end_var = tk.StringVar(value="")
+        ttk.Entry(cagr_input_frame, textvariable=self.cagr_end_var, width=15).grid(row=1, column=1, padx=5)
+        
+        ttk.Label(cagr_input_frame, text="Number of Years:").grid(row=2, column=0, sticky=tk.W, pady=2)
+        self.cagr_years_var = tk.IntVar(value=1)
+        ttk.Spinbox(cagr_input_frame, from_=1, to=20, textvariable=self.cagr_years_var, width=13).grid(row=2, column=1, padx=5)
+        
+        # CAGR calculate button and result
+        cagr_calc_frame = ttk.Frame(calc2_frame)
+        cagr_calc_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(cagr_calc_frame, text="Calculate CAGR", 
+                  command=self.calculate_cagr).pack(side=tk.LEFT)
+        
+        self.cagr_result_label = ttk.Label(calc2_frame, text="Result: --", 
+                                         foreground='green', font=('Arial', 10, 'bold'))
+        self.cagr_result_label.pack(anchor=tk.W, pady=(5, 0))
+        
+        # Apply button
+        ttk.Button(calc2_frame, text="Apply to Simulation", 
+                  command=self.apply_cagr_growth).pack(anchor=tk.W, pady=(5, 0))
+        
+        # Example/Help section
+        help_frame = ttk.LabelFrame(parent, text="Quick Help", padding=10)
+        help_frame.pack(fill=tk.X, pady=(10, 0))
+        
+        help_text = ("Tips:\n"
+                    "• Historical Calculator: Best for 3+ years of data\n"
+                    "• CAGR Calculator: Perfect for start/end comparisons\n"
+                    "• Industry average growth rates:\n"
+                    "  - Mature industries: 2-5%\n"
+                    "  - Growing sectors: 8-15%\n"
+                    "  - Tech/startups: 20-50%")
+        
+        ttk.Label(help_frame, text=help_text, font=('Arial', 8), 
+                 foreground='#333333', justify=tk.LEFT).pack(anchor=tk.W)
+    
+    def add_revenue_row(self, index):
+        row_frame = ttk.Frame(self.revenue_entries_frame)
+        row_frame.pack(fill=tk.X, pady=1)
+        
+        # Year entry
+        year_var = tk.StringVar(value=str(2022 + index))
+        year_entry = ttk.Entry(row_frame, textvariable=year_var, width=8)
+        year_entry.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Revenue entry
+        revenue_var = tk.StringVar(value="")
+        revenue_entry = ttk.Entry(row_frame, textvariable=revenue_var, width=15)
+        revenue_entry.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # Labels
+        ttk.Label(row_frame, text="Year", font=('Arial', 7)).pack(side=tk.RIGHT, padx=(10, 0))
+        ttk.Label(row_frame, text="Revenue (£)", font=('Arial', 7)).pack(side=tk.RIGHT, padx=(10, 0))
+        
+        self.year_entries.append(year_var)
+        self.revenue_entries.append(revenue_var)
+    
+    def add_revenue_year(self):
+        if len(self.revenue_entries) < 10:  # Limit to 10 years
+            self.add_revenue_row(len(self.revenue_entries))
+    
+    def remove_revenue_year(self):
+        if len(self.revenue_entries) > 2:  # Keep minimum 2 years
+            # Remove the last row
+            last_frame = list(self.revenue_entries_frame.children.values())[-1]
+            last_frame.destroy()
+            self.year_entries.pop()
+            self.revenue_entries.pop()
+    
+    def calculate_historical_growth(self):
+        try:
+            # Get revenue data
+            revenues = []
+            years = []
+            
+            for i, (year_var, revenue_var) in enumerate(zip(self.year_entries, self.revenue_entries)):
+                year_str = year_var.get().strip()
+                revenue_str = revenue_var.get().strip()
+                
+                if year_str and revenue_str:
+                    year = int(year_str)
+                    revenue = float(revenue_str.replace(',', ''))
+                    years.append(year)
+                    revenues.append(revenue)
+            
+            if len(revenues) < 2:
+                messagebox.showwarning("Insufficient Data", "Please enter at least 2 years of revenue data.")
+                return
+            
+            # Sort by year
+            sorted_data = sorted(zip(years, revenues))
+            years, revenues = zip(*sorted_data)
+            
+            # Calculate year-over-year growth rates
+            growth_rates = []
+            for i in range(1, len(revenues)):
+                growth_rate = ((revenues[i] / revenues[i-1]) - 1) * 100
+                growth_rates.append(growth_rate)
+            
+            # Calculate average growth rate
+            avg_growth = sum(growth_rates) / len(growth_rates)
+            
+            # Show detailed results
+            result_text = f"Average Growth Rate: {avg_growth:.2f}%\n"
+            result_text += f"Based on {len(growth_rates)} year-over-year periods:\n"
+            for i, rate in enumerate(growth_rates):
+                result_text += f"  {years[i]} → {years[i+1]}: {rate:.1f}%\n"
+            
+            self.historical_result_label.config(text=f"Result: {avg_growth:.2f}% average growth")
+            
+            # Store for apply button
+            self.calculated_historical_growth = avg_growth
+            
+            messagebox.showinfo("Historical Growth Calculation", result_text)
+            
+        except ValueError as e:
+            messagebox.showerror("Input Error", "Please enter valid numbers for years and revenues.\nExample: Year: 2023, Revenue: 1000000")
+        except Exception as e:
+            messagebox.showerror("Calculation Error", f"Error calculating growth rate: {str(e)}")
+    
+    def apply_historical_growth(self):
+        if hasattr(self, 'calculated_historical_growth'):
+            self.growth_var.set(self.calculated_historical_growth)
+            self.growth_label.config(text=f"{self.calculated_historical_growth:.1f}%")
+            messagebox.showinfo("Applied", f"Historical growth rate of {self.calculated_historical_growth:.2f}% applied to simulation.")
+        else:
+            messagebox.showwarning("No Calculation", "Please calculate historical growth rate first.")
+    
+    def calculate_cagr(self):
+        try:
+            start_value = float(self.cagr_start_var.get().replace(',', ''))
+            end_value = float(self.cagr_end_var.get().replace(',', ''))
+            years = self.cagr_years_var.get()
+            
+            if start_value <= 0 or end_value <= 0:
+                messagebox.showerror("Invalid Input", "Values must be positive numbers.")
+                return
+            
+            if years <= 0:
+                messagebox.showerror("Invalid Input", "Number of years must be positive.")
+                return
+            
+            # Calculate CAGR: (End Value / Start Value)^(1/years) - 1
+            cagr = ((end_value / start_value) ** (1/years) - 1) * 100
+            
+            # Show detailed calculation
+            total_growth = ((end_value / start_value) - 1) * 100
+            result_text = (f"CAGR Calculation:\n"
+                          f"Start Value: £{start_value:,.0f}\n"
+                          f"End Value: £{end_value:,.0f}\n"
+                          f"Time Period: {years} years\n"
+                          f"Total Growth: {total_growth:.1f}%\n"
+                          f"Compound Annual Growth Rate: {cagr:.2f}%")
+            
+            self.cagr_result_label.config(text=f"Result: {cagr:.2f}% CAGR")
+            
+            # Store for apply button
+            self.calculated_cagr = cagr
+            
+            messagebox.showinfo("CAGR Calculation", result_text)
+            
+        except ValueError:
+            messagebox.showerror("Input Error", "Please enter valid numbers.\nExample: Start: 800000, End: 1200000, Years: 3")
+        except Exception as e:
+            messagebox.showerror("Calculation Error", f"Error calculating CAGR: {str(e)}")
+    
+    def apply_cagr_growth(self):
+        if hasattr(self, 'calculated_cagr'):
+            self.growth_var.set(self.calculated_cagr)
+            self.growth_label.config(text=f"{self.calculated_cagr:.1f}%")
+            messagebox.showinfo("Applied", f"CAGR of {self.calculated_cagr:.2f}% applied to simulation.")
+        else:
+            messagebox.showwarning("No Calculation", "Please calculate CAGR first.")
     
     def create_scenario_selection_frame(self, parent):
         scenario_frame = ttk.LabelFrame(parent, text="Market Scenarios", padding=10)
@@ -520,21 +792,30 @@ class BusinessSimulatorGUI:
         
     def update_years_label(self, value):
         self.years_label.config(text=f"{int(float(value))} years")
+    
+    def update_staff_label_on_salary_change(self, event=None):
+        # Trigger update when salary changes
+        self.update_staff_label(self.staff_var.get())
         
     def update_staff_label(self, value):
         staff_count = int(float(value))
         self.staff_label.config(text=f"{staff_count} staff")
         if staff_count > 0:
-            growth_impact = staff_count * 1.5
-            cost_impact = staff_count * 55000
-            self.staff_impact_label.config(
-                text=f"Impact: +{growth_impact:.1f}% growth, +£{cost_impact:,} annual costs", foreground='blue')
+            try:
+                salary = float(self.salary_var.get())
+                growth_impact = staff_count * 0.15  # 0.15% per employee
+                cost_impact = staff_count * salary
+                self.staff_impact_label.config(
+                    text=f"Impact: +{growth_impact:.2f}% growth, +£{cost_impact:,} annual costs", foreground='blue')
+            except ValueError:
+                self.staff_impact_label.config(
+                    text="Impact: Growth boost, cost depends on salary", foreground='orange')
         else:
             self.staff_impact_label.config(text="Impact: No change", foreground='gray')
     
     def update_expansion_label(self):
         if self.expansion_var.get():
-            self.expansion_impact_label.config(text="Impact: +12% growth, +25% costs, +risk factor", foreground='blue')
+            self.expansion_impact_label.config(text="Impact: +2% growth, +25% costs, +risk factor", foreground='blue')
         else:
             self.expansion_impact_label.config(text="Impact: No expansion", foreground='gray')
     
@@ -571,6 +852,7 @@ class BusinessSimulatorGUI:
                 base_revenue=float(self.revenue_var.get()),
                 base_costs=float(self.costs_var.get()),
                 num_employees=self.employees_var.get(),
+                avg_employee_salary=float(self.salary_var.get()),
                 baseline_growth_rate=self.growth_var.get() / 100,
                 simulation_years=self.years_var.get()
             )
@@ -801,6 +1083,7 @@ class BusinessSimulatorGUI:
         summary.append(f"  • Initial Costs: £{self.current_base_params.base_costs:,.0f}")
         summary.append(f"  • Initial Profit: £{self.current_base_params.base_revenue - self.current_base_params.base_costs:,.0f}")
         summary.append(f"  • Employees: {self.current_base_params.num_employees:,}")
+        summary.append(f"  • Average Employee Salary: £{self.current_base_params.avg_employee_salary:,.0f}")
         summary.append(f"  • Baseline Growth: {self.current_base_params.baseline_growth_rate*100:.1f}%")
         summary.append(f"  • Simulation Period: {self.current_base_params.simulation_years} years")
         summary.append("")
@@ -819,7 +1102,10 @@ class BusinessSimulatorGUI:
         breakdown = impacts['breakdown']
         for decision_type, impact in breakdown.items():
             if any(v != 0 for v in impact.values()):
-                summary.append(f"    - {decision_type.title()}: Growth +{impact.get('growth', 0)*100:.3f}%, Cost £{impact.get('cost', 0):,.0f}")
+                if decision_type == 'hiring' and impact.get('cost', 0) != 0:
+                    summary.append(f"    - {decision_type.title()}: Growth +{impact.get('growth', 0)*100:.3f}%, Cost £{impact.get('cost', 0):,.0f} (@ £{self.current_base_params.avg_employee_salary:,.0f}/employee)")
+                else:
+                    summary.append(f"    - {decision_type.title()}: Growth +{impact.get('growth', 0)*100:.3f}%, Cost £{impact.get('cost', 0):,.0f}")
         summary.append("")
         
         # Scenario results
@@ -873,7 +1159,8 @@ class BusinessSimulatorGUI:
         
         # Decision-based recommendations
         if self.current_decisions.staff_to_hire > 0:
-            summary.append("  • Staff hiring shows positive growth impact - monitor productivity gains")
+            summary.append(f"  • Staff hiring shows positive growth impact - monitor productivity gains")
+            summary.append(f"    (Hiring {self.current_decisions.staff_to_hire} employees at £{self.current_base_params.avg_employee_salary:,.0f} each)")
         if self.current_decisions.expand_new_region:
             summary.append("  • Regional expansion increases both growth potential and risk - ensure market research")
         if self.current_decisions.automation_percentage > 0:
