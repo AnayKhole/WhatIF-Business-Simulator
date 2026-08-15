@@ -1,8 +1,3 @@
-"""
-Python Business Growth Simulator - Interactive GUI
-Monte Carlo simulation using only built-in Python libraries
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import matplotlib.pyplot as plt
